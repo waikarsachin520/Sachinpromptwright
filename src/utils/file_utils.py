@@ -48,23 +48,60 @@ class FileUtils:
         try:
             if platform.system() == 'Windows':
                 import win32security
-                import win32con
+                import win32api
+                import ntsecuritycon
+
+                # Get the file's security descriptor
                 security = win32security.GetFileSecurity(
                     str(path), 
                     win32security.DACL_SECURITY_INFORMATION
                 )
                 dacl = security.GetSecurityDescriptorDacl()
-                # Convert Windows permissions to Unix-like format
-                mode = 0
+                
+                # Initialize permission flags
+                can_read = False
+                can_write = False
+                can_execute = False
+                
                 if dacl:
+                    # Get current process token
+                    process_handle = win32api.GetCurrentProcess()
+                    token_handle = win32security.OpenProcessToken(
+                        process_handle,
+                        win32security.TOKEN_QUERY
+                    )
+                    
+                    # Get current user's SID
+                    current_user = win32security.GetTokenInformation(
+                        token_handle,
+                        win32security.TokenUser
+                    )[0]
+                    
+                    # Check each ACE (Access Control Entry)
                     for i in range(dacl.GetAceCount()):
                         ace = dacl.GetAce(i)
-                        if ace[2] & win32con.FILE_GENERIC_READ:
-                            mode |= 0o444
-                        if ace[2] & win32con.FILE_GENERIC_WRITE:
-                            mode |= 0o222
-                        if ace[2] & win32con.FILE_GENERIC_EXECUTE:
-                            mode |= 0o111
+                        # GetAce returns tuple of (AceType, AceFlags, Mask) or (AceType, AceFlags, Mask, Sid)
+                        ace_mask = ace[2]  # Mask is always the third element
+                        ace_sid = ace[3] if len(ace) > 3 else None  # Sid might be fourth element
+                        
+                        # Check if this ACE applies to the current user
+                        if ace_sid == current_user:
+                            if ace_mask & ntsecuritycon.FILE_GENERIC_READ:
+                                can_read = True
+                            if ace_mask & ntsecuritycon.FILE_GENERIC_WRITE:
+                                can_write = True
+                            if ace_mask & ntsecuritycon.FILE_GENERIC_EXECUTE:
+                                can_execute = True
+                
+                # Convert to Unix-style permissions
+                mode = 0
+                if can_read:
+                    mode |= 0o444
+                if can_write:
+                    mode |= 0o222
+                if can_execute:
+                    mode |= 0o111
+                    
                 return oct(mode)[-3:]
             else:
                 return oct(path.stat().st_mode)[-3:]
