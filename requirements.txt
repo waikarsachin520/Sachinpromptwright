@@ -7,3 +7,4 @@ langchain-groq==0.2.4
 pandas>=2.0.0
 testronai-browser-use==0.1.35
 psutil>=5.9.0
+pywin32; platform_system == "Windows"
