@@ -13,6 +13,7 @@ import logging
 from services.config_manager import ConfigManager
 from datetime import datetime
 from utils.logger_config import setup_logger
+import platform
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -39,8 +40,15 @@ class BrowserTaskRunner:
         logger.info(f"HISTORY_DIR exists: {Path(history_dir).exists()}")
         if Path(history_dir).exists():
             logger.info(f"HISTORY_DIR permissions: {oct(Path(history_dir).stat().st_mode)[-3:]}")
-            logger.info(f"HISTORY_DIR owner: {Path(history_dir).owner()}")
-            logger.info(f"HISTORY_DIR group: {Path(history_dir).group()}")
+            try:
+                # Check if the system supports owner() method
+                if platform.system() in ['Linux', 'Darwin']:  # Add other systems if needed
+                    logger.info(f"HISTORY_DIR owner: {Path(history_dir).owner()}")
+                    logger.info(f"HISTORY_DIR group: {Path(history_dir).group()}")
+                else:
+                    logger.info("HISTORY_DIR owner and group information is not supported on this system.")
+            except Exception as e:
+                logger.warning(f"Failed to retrieve owner/group information: {str(e)}")
         logger.info("=====================================\n")
         
         # Initialize config manager
