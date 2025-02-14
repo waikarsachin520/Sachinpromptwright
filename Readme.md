@@ -2,7 +2,10 @@
 
 <img src="assets/promptwright-logo-small.png" alt="Promptwright Logo" width="250"/>
 
-     
+## Watch Demo 🎥
+Click on the image below to watch the demo video:
+
+[![Promptwright Demo](https://img.youtube.com/vi/93iif6_YZBs/0.jpg)](https://youtu.be/93iif6_YZBs)
 
 Promptwright is an AI-powered tool that transforms natural-language user prompts into automated browser workflows while generating reusable test automation scripts. It bridges no-code simplicity with pro-code efficiency.
 
