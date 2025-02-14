@@ -1,0 +1,112 @@
+Analyze the provided JSON history of browser interactions and generate Cypress TypeScript code that exactly replicates the workflow. The code must follow these strict requirements:
+
+1. Code Organization and Structure:
+   - Use TypeScript with proper type annotations
+   - Create a single test flow that matches the sequence in history.json
+   - Include all necessary imports (cypress, faker for test data)
+   - Use descriptive test names that reflect the workflow
+   - Break down complex actions into commented sections
+   - Follow consistent code formatting and organization
+
+2. Locator Strategy (in priority order):
+   a. Data-test/Data-cy attributes (preferred)
+      - Example: cy.get('[data-test="submit-button"]')
+   b. Label-based locators for form fields
+      - Example: cy.get('label').contains('First Name').parent().find('input')
+   c. Element IDs
+      - Example: cy.get('#elementId')
+   d. Text-based locators with exact matching
+      - Example: cy.contains('Submit', { matchCase: true })
+   e. CSS selectors (only when above options aren't available)
+      - Use parent-child relationships for ambiguous elements
+      - Example: cy.get('.form-section').find('button')
+
+3. Navigation and Waiting:
+   - Use proper Cypress waiting mechanisms
+   - Utilize Cypress's automatic retry-ability
+   - Never use arbitrary timeouts or sleeps
+   - Handle page transitions properly
+   - Example:
+     ```typescript
+     cy.url().should('include', '/newpage');
+     cy.get('#element').should('be.visible');
+     ```
+
+4. Data Input and Validation:
+   - Use faker.js for generating realistic test data
+   - Maintain data consistency throughout the workflow
+   - For assertions:
+     * ONLY add assertions that can be directly derived from the history.json data
+     * Do not assume presence of success messages or specific UI elements unless explicitly shown in the history
+     * If no clear validation points exist in the history, limit to basic existence/visibility checks of interacted elements
+     * Example:
+     ```typescript
+     const firstName = faker.person.firstName();
+     cy.get('input[name="firstName"]').type(firstName);
+     // Only assert what we can verify from the history
+     cy.get('input[name="firstName"]').should('have.value', firstName);
+     ```
+
+5. Error Handling and Reliability:
+   - Use proper error handling with cy.on('uncaught:exception')
+   - Add retry options for flaky operations
+   - Use proper assertion timeouts
+   - Handle potential alert/dialog popups
+   - Example:
+     ```typescript
+     Cypress.on('uncaught:exception', (err) => {
+       console.log('Handling error:', err);
+       return false;
+     });
+     
+     cy.get('#element', { timeout: 10000 }).should('be.visible');
+     ```
+
+6. Element Selection Strategy:
+   - When generating locators, analyze ALL available attributes in the history.json
+   - Prefer data-test/data-cy attributes when available
+   - Ignore attributes that appear to be dynamic or random
+     * Skip attributes that look like random strings (e.g., id="APjFqb", data-id="xyz123")
+     * Skip auto-generated class names (e.g., class="MuiButton-root-123")
+     * Skip any attribute values that contain random-looking numbers or hashes
+   - If multiple attributes are available, combine the stable ones for unique identification
+   - Priority order for attributes:
+     1. Data attributes (data-test, data-cy)
+     2. Semantic attributes (role, type, name, aria-label)
+     3. Stable, predictable IDs
+     4. CSS selectors with multiple stable attributes
+   - Example:
+     ```typescript
+     // DON'T - Using random/dynamic ID
+     cy.get('#APjFqb')
+     
+     // DO - Use stable attributes instead
+     cy.get('input[name="q"][type="text"][aria-label="Search"]')
+     ```
+
+Here is the expected code format:
+```typescript
+import { faker } from '@faker-js/faker';
+
+describe('descriptive test name for the workflow', () => {
+    beforeEach(() => {
+        cy.visit('url');
+    });
+
+    it('performs the workflow steps', () => {
+        // 1. Form Interaction
+        const userData = {
+            firstName: faker.person.firstName(),
+            email: faker.internet.email()
+        };
+        
+        cy.get('input[name="firstName"]').type(userData.firstName);
+        
+        // 2. Basic Validation (only if verifiable from history)
+        cy.get('input[name="firstName"]').should('have.value', userData.firstName);
+    });
+});
+```
+
+Here is the json file content:
+{json_file_content} 

@@ -1,0 +1,133 @@
+Analyze the provided JSON history of browser interactions and generate Playwright Python code that exactly replicates the workflow. The code must follow these strict requirements:
+
+1. Code Organization and Structure:
+   - Use Python with type hints (when beneficial)
+   - Create a single test function that matches the sequence in history.json
+   - Include all necessary imports (pytest, playwright, faker for test data)
+   - Use descriptive test names that reflect the workflow
+   - Break down complex actions into commented sections
+   - Follow PEP 8 style guidelines and consistent code formatting
+
+2. Locator Strategy (in priority order):
+   a. Role-based locators with specific attributes
+      - Example: get_by_role('button', name='Submit')
+   b. Label-based locators for form fields
+      - Example: get_by_label('First Name')
+   c. Element IDs
+      - Use page.locator('#elementId') for elements with IDs
+   d. Text-based locators with exact matching
+      - Example: get_by_text('Submit', exact=True)
+   e. CSS selectors (only when above options aren't available)
+      - Use parent-child relationships for ambiguous elements
+      - Example: page.locator('.form-section').get_by_role('button')
+
+3. Navigation and Waiting:
+   - Use context.wait_for_event('page') for new page loads
+   - Utilize Playwright's auto-waiting features
+   - Never use arbitrary timeouts or sleeps
+   - Handle page transitions properly
+   - Example:
+     ```python
+     new_page = await context.wait_for_event('page')
+     await new_page.wait_for_load_state('networkidle')
+     ```
+
+4. Data Input and Validation:
+   - Use faker library for generating realistic test data
+   - Maintain data consistency throughout the workflow
+   - For assertions:
+     * ONLY add assertions that can be directly derived from the history.json data
+     * Do not assume presence of success messages or specific UI elements unless explicitly shown in the history
+     * If no clear validation points exist in the history, limit to basic existence/visibility checks of interacted elements
+     * Example:
+     ```python
+     first_name = fake.first_name()
+     await page.get_by_label('First Name').fill(first_name)
+     # Only assert what we can verify from the history
+     assert await page.get_by_label('First Name').input_value() == first_name
+     ```
+
+5. Error Handling and Reliability:
+   - Include try-except blocks for potential failures
+   - Add retry logic for flaky operations
+   - Use proper assertion timeouts
+   - Handle potential alert/dialog popups
+   - Example:
+     ```python
+     try:
+         # Only use assertions based on actual history data
+         assert await page.locator('#someElement').is_visible(timeout=2000)
+     except Exception as e:
+         print('Handling error:', e)
+     ```
+
+3. Element Selection Strategy:
+   - When generating locators, analyze ALL available attributes in the history.json
+   - Ignore attributes that appear to be dynamic or random (e.g., random-looking IDs, auto-generated classes)
+     * Skip attributes that look like random strings (e.g., id="APjFqb", data-id="xyz123")
+     * Skip auto-generated class names (e.g., class="MuiButton-root-123")
+     * Skip any attribute values that contain random-looking numbers or hashes
+   - If multiple attributes are available (role, type, name, aria-label, id, class), combine the stable ones for unique identification
+   - Priority order for attributes:
+     1. Semantic attributes (role, type, name, aria-label)
+     2. Stable, predictable IDs (e.g., 'submit-button', 'login-form')
+     3. CSS selectors with multiple stable attributes
+   - Example:
+     ```python
+     # DON'T - Using random/dynamic ID
+     page.locator('#APjFqb')
+     
+     # DO - Use stable, semantic attributes instead
+     page.locator('input[name="q"][type="text"][aria-label="Search"]')
+     ```
+
+   - When dealing with complex selectors from history.json:
+     ```json
+     {
+       "css_selector": "input[id=\"APjFqb\"][aria-label=\"Google Search\"][name=\"q\"][role=\"combobox\"]"
+     }
+     ```
+     Transform into Playwright locator by removing random attributes:
+     ```python
+     # Remove the random ID "APjFqb" and keep stable attributes
+     page.locator('input[aria-label="Google Search"][name="q"][role="combobox"]')
+     ```
+
+4. Handling Multiple Matches:
+   - Always check if the element might have duplicates in the DOM
+   - Use the most specific combination of attributes possible
+   - Consider using nth-match or first/last if multiple elements are expected
+   - Example:
+     ```python
+     # If multiple matches are possible but we want a specific one
+     page.locator('input[name="btnK"][role="button"]').first
+     # Or use nth if specific index is known
+     page.locator('input[name="btnK"][role="button"]').nth(0)
+     ```
+
+Here is the expected code format:
+```python
+import pytest
+from playwright.sync_api import Page, expect
+from faker import Faker
+
+fake = Faker()
+
+@pytest.mark.asyncio
+async def test_descriptive_name_for_workflow(page: Page, context):
+    # 1. Initial Navigation
+    await page.goto('url', wait_until='networkidle')
+    
+    # 2. Form Interaction
+    user_data = {
+        'first_name': fake.first_name(),
+        'email': fake.email()
+    }
+    await page.get_by_label('First Name').fill(user_data['first_name'])
+    
+    # 3. Basic Validation (only if verifiable from history)
+    assert await page.get_by_label('First Name').input_value() == user_data['first_name']
+```
+
+Here is the json file content:
+{json_file_content}

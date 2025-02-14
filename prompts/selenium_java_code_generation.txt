@@ -1,0 +1,139 @@
+Analyze the provided JSON history of browser interactions and generate Java Selenium code that exactly replicates the workflow. The code must follow these strict requirements:
+
+1. Code Organization and Structure:
+   - Use Java with proper object-oriented design
+   - Create a single test class that matches the sequence in history.json
+   - Include all necessary imports (Selenium WebDriver, TestNG/JUnit, etc.)
+   - Use Page Object Model (POM) design pattern
+   - Use descriptive test names that reflect the workflow
+   - Break down complex actions into commented sections
+   - Follow Java naming conventions and code organization
+   - Use explicit waits for better reliability
+
+2. Locator Strategy (in priority order):
+   a. Data-test/Data-testid attributes (preferred)
+      - Example: driver.findElement(By.cssSelector("[data-test='submit-button']"))
+   b. ID (when stable)
+      - Example: driver.findElement(By.id("elementId"))
+   c. Name attribute
+      - Example: driver.findElement(By.name("username"))
+   d. Label-based XPath for form fields (when necessary)
+      - Example: driver.findElement(By.xpath("//label[text()='First Name']/following-sibling::input"))
+   e. CSS selectors (only when above options aren't available)
+      - Use parent-child relationships for ambiguous elements
+      - Example: driver.findElement(By.cssSelector(".form-section button"))
+
+3. Waits and Synchronization:
+   - Use WebDriverWait with ExpectedConditions
+   - Never use Thread.sleep()
+   - Handle page transitions properly
+   - Example:
+     ```java
+     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+     wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("element")));
+     ```
+
+4. Data Input and Validation:
+   - Use Java Faker for generating realistic test data
+   - Maintain data consistency throughout the workflow
+   - For assertions:
+     * Use TestNG/JUnit assertions appropriately
+     * ONLY add assertions that can be directly derived from the history.json data
+     * Do not assume presence of success messages or specific UI elements unless explicitly shown in the history
+     * Example:
+     ```java
+     String firstName = faker.name().firstName();
+     driver.findElement(By.name("firstName")).sendKeys(firstName);
+     // Only assert what we can verify from the history
+     assertEquals(driver.findElement(By.name("firstName")).getAttribute("value"), firstName);
+     ```
+
+5. Error Handling and Reliability:
+   - Implement proper exception handling
+   - Use try-catch blocks where appropriate
+   - Add retry mechanism for flaky operations
+   - Handle potential alert/dialog popups
+   - Example:
+     ```java
+     try {
+         WebElement element = wait.until(ExpectedConditions.elementToBeClickable(By.id("element")));
+         element.click();
+     } catch (TimeoutException e) {
+         logger.error("Element not clickable after timeout: " + e.getMessage());
+         throw e;
+     }
+     ```
+
+6. Element Selection Strategy:
+   - When generating locators, analyze ALL available attributes in the history.json
+   - Prefer data-test/data-testid attributes when available
+   - Ignore attributes that appear to be dynamic or random
+     * Skip attributes that look like random strings (e.g., id="APjFqb", data-id="xyz123")
+     * Skip auto-generated class names (e.g., class="MuiButton-root-123")
+     * Skip any attribute values that contain random-looking numbers or hashes
+   - If multiple attributes are available, combine the stable ones for unique identification
+   - Priority order for attributes:
+     1. Data attributes (data-test, data-testid)
+     2. ID (when stable)
+     3. Name
+     4. Semantic attributes (role, aria-label)
+     5. CSS selectors with multiple stable attributes
+   - Example:
+     ```java
+     // DON'T - Using random/dynamic ID
+     driver.findElement(By.id("APjFqb"));
+     
+     // DO - Use stable attributes instead
+     driver.findElement(By.cssSelector("input[name='q'][type='text'][aria-label='Search']"));
+     ```
+
+Here is the expected code format:
+```java
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.testng.annotations.*;
+import com.github.javafaker.Faker;
+import java.time.Duration;
+
+public class WorkflowTest {
+    private WebDriver driver;
+    private WebDriverWait wait;
+    private Faker faker;
+
+    @BeforeClass
+    public void setUp() {
+        driver = new ChromeDriver();
+        wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        faker = new Faker();
+    }
+
+    @Test
+    public void performWorkflowSteps() {
+        // 1. Navigate to the page
+        driver.get("url");
+
+        // 2. Form Interaction
+        String firstName = faker.name().firstName();
+        WebElement firstNameInput = wait.until(
+            ExpectedConditions.visibilityOfElementLocated(By.name("firstName"))
+        );
+        firstNameInput.sendKeys(firstName);
+
+        // 3. Basic Validation (only if verifiable from history)
+        assertEquals(firstNameInput.getAttribute("value"), firstName);
+    }
+
+    @AfterClass
+    public void tearDown() {
+        if (driver != null) {
+            driver.quit();
+        }
+    }
+}
+```
+
+Here is the json file content:
+{json_file_content} 
