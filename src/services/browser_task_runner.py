@@ -53,7 +53,6 @@ class BrowserTaskRunner:
         
         # Debug logging
         logger.debug("BrowserTaskRunner initialized")
-
     def _get_browser_config(self) -> BrowserConfig:
         """
         Configure and return browser settings based on latest configuration
@@ -64,8 +63,16 @@ class BrowserTaskRunner:
         
         logger.debug(f"Configuring browser with type: {self.browser_type}")
         
+        # Get headless mode from environment variable, default to True
+        headless_mode = self.config_manager.get_config('BROWSER_HEADLESS', 'true').lower() == 'true'
+        
+        # Add prominent console log for headless mode
+        logger.info("\n" + "="*50)
+        logger.info(f"🎭 Browser Headless Mode: {'ON' if headless_mode else 'OFF'}")
+        logger.info("="*50 + "\n")
+        
         config_params = {
-            'headless': False,
+            'headless': headless_mode,
             'disable_security': True,
             'highlight_elements': False
         }
@@ -73,6 +80,7 @@ class BrowserTaskRunner:
         logger.info("\n=== Browser Configuration Details ===")
         logger.info(f"Browser Type: {self.browser_type}")
         logger.info(f"Cloud Provider: {self.cloud_provider}")
+        logger.info(f"Headless Mode: {headless_mode}")
         logger.debug(f"Initial config_params: {config_params}")
         
         if self.browser_type == 'remote':
