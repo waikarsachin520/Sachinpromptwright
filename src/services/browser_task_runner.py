@@ -13,6 +13,7 @@ import logging
 from services.config_manager import ConfigManager
 from datetime import datetime
 from utils.logger_config import setup_logger
+from utils.file_utils import FileUtils
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -38,9 +39,9 @@ class BrowserTaskRunner:
         logger.info(f"HISTORY_DIR environment variable: {history_dir}")
         logger.info(f"HISTORY_DIR exists: {Path(history_dir).exists()}")
         if Path(history_dir).exists():
-            logger.info(f"HISTORY_DIR permissions: {oct(Path(history_dir).stat().st_mode)[-3:]}")
-            logger.info(f"HISTORY_DIR owner: {Path(history_dir).owner()}")
-            logger.info(f"HISTORY_DIR group: {Path(history_dir).group()}")
+            logger.info(f"HISTORY_DIR permissions: {FileUtils.get_file_permissions(Path(history_dir))}")
+            logger.info(f"HISTORY_DIR owner: {FileUtils.get_file_owner(Path(history_dir))}")
+            logger.info(f"HISTORY_DIR group: {FileUtils.get_file_group(Path(history_dir))}")
         logger.info("=====================================\n")
         
         # Initialize config manager
@@ -210,8 +211,8 @@ class BrowserTaskRunner:
         try:
             history_folder.mkdir(exist_ok=True)
             logger.info(f"Successfully created history folder at {history_folder}")
-            logger.info(f"History folder permissions: {oct(history_folder.stat().st_mode)[-3:]}")
-            logger.info(f"History folder owner: {history_folder.owner()}")
+            logger.info(f"History folder permissions: {FileUtils.get_file_permissions(history_folder)}")
+            logger.info(f"History folder owner: {FileUtils.get_file_owner(history_folder)}")
         except Exception as e:
             logger.error(f"Failed to create history folder: {str(e)}")
             logger.error(f"Current process user ID: {os.getuid()}")
@@ -224,8 +225,8 @@ class BrowserTaskRunner:
         try:
             timestamp_folder.mkdir(exist_ok=True)
             logger.info(f"Created timestamp folder: {timestamp_folder}")
-            logger.info(f"Timestamp folder permissions: {oct(timestamp_folder.stat().st_mode)[-3:]}")
-            logger.info(f"Timestamp folder owner: {timestamp_folder.owner()}")
+            logger.info(f"Timestamp folder permissions: {FileUtils.get_file_permissions(timestamp_folder)}")
+            logger.info(f"Timestamp folder owner: {FileUtils.get_file_owner(timestamp_folder)}")
             
             # Ensure timestamp folder has write permissions
             timestamp_folder.chmod(0o755)
@@ -320,7 +321,7 @@ class BrowserTaskRunner:
                 logger.info(f"Creating new folder: {new_folder}")
                 if not new_folder.exists():
                     new_folder.mkdir(exist_ok=True)
-                    logger.info(f"Created new folder with permissions: {oct(new_folder.stat().st_mode)[-3:]}")
+                    logger.info(f"Created new folder with permissions: {FileUtils.get_file_permissions(new_folder)}")
                 
                 # Move history file if it exists
                 if history_path.exists():
@@ -342,7 +343,7 @@ class BrowserTaskRunner:
             try:
                 logger.info(f"Attempting to save history to file: {history_path}")
                 logger.info(f"History file parent folder exists: {Path(history_path).parent.exists()}")
-                logger.info(f"History file parent folder permissions: {oct(Path(history_path).parent.stat().st_mode)[-3:]}")
+                logger.info(f"History file parent folder permissions: {FileUtils.get_file_permissions(Path(history_path).parent)}")
                 
                 # Try to create an empty file first to test write permissions
                 try:
@@ -373,7 +374,7 @@ class BrowserTaskRunner:
                 
                 if Path(history_path).exists():
                     logger.info(f"Successfully saved history file at {history_path}")
-                    logger.info(f"History file permissions: {oct(Path(history_path).stat().st_mode)[-3:]}")
+                    logger.info(f"History file permissions: {FileUtils.get_file_permissions(Path(history_path))}")
                     logger.info(f"History file size: {Path(history_path).stat().st_size} bytes")
                     
                     # Try to read the file back to verify it's readable
@@ -395,7 +396,7 @@ class BrowserTaskRunner:
                 logger.error(f"Parent directory listing:")
                 try:
                     for item in Path(history_path).parent.iterdir():
-                        logger.error(f"  {item.name}: {oct(item.stat().st_mode)[-3:]}")
+                        logger.error(f"  {item.name}: {FileUtils.get_file_permissions(item)}")
                 except Exception as list_error:
                     logger.error(f"Failed to list parent directory: {str(list_error)}")
                 raise BrowserTaskExecutionError(f"Failed to save history file: {str(e)}")

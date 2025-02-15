@@ -1075,7 +1075,7 @@ if submitted and task:
                             
                             # Add New Task button in the second column
                             with col2:
-                                if st.button("🔄 Start New Task", key="new_task_button", use_container_width=True, type="primary", on_click=clear_task_input):
+                                if st.button("🔄 Start New Task", key="new_task_button_bottom", use_container_width=True, type="primary", on_click=clear_task_input):
                                     code_section.empty()
                                     button_section.empty()
                                     gif_section.empty()
