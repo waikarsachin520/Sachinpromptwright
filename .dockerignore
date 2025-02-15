@@ -1,0 +1,64 @@
+# Environment files
+.env
+.env.local
+.env.*
+*.env
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.py[cod]
+*$py.class
+.pytest_cache
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+.env
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+*.sublime-workspace
+*.sublime-project
+
+# Build and dist directories
+build/
+dist/
+*.egg-info/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Local development specific
+docker-compose.override.yml
+docker-compose.*.yml
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test files
+test/
+tests/

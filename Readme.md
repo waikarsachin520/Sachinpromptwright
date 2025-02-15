@@ -91,6 +91,37 @@ streamlit run src/app.py
 
 The application will be available at `http://localhost:8501` by default.
 
+## Docker Execution
+
+Promptwright can be run as a Docker container, with Chrome browser and Playwright pre-installed in the image.
+
+### Docker Setup
+
+1. Build the Docker image:
+   ```bash
+   docker build -t promptwright:0.1 .
+   ```
+
+2. Run the container:
+   ```bash
+   docker run -p 8080:8080 --name promptwright_container promptwright:0.1
+   ```
+
+3. Access the application at `http://localhost:8080`
+
+### Notes
+- The Docker image includes:
+  - Chrome browser
+  - Playwright with all dependencies
+  - Required system libraries
+  - Python environment
+- All browser automation executes inside the container
+- No need to install Chrome or Playwright on your host machine
+- To rebuild and restart in one command:
+  ```bash
+  docker rm -f promptwright_container || true && docker build -t promptwright:0.1 . && docker run -p 8080:8080 --name promptwright_container promptwright:0.1
+  ```
+
 ## Using Promptwright
 
 1. Configure your preferences in the sidebar:
