@@ -2,6 +2,7 @@ import os
 import json
 from dotenv import load_dotenv, find_dotenv
 import logging
+from urllib.parse import urlparse
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ class ConfigManager:
 
     def __init__(self):
         if not self._initialized:
-            # Load .env file as base configuration
+            # Load .env file without clearing existing environment variables
             load_dotenv(find_dotenv(), override=True)
             self._runtime_config = {}
             self._initialized = True
@@ -37,6 +38,10 @@ class ConfigManager:
         # Special handling for CODE_GENERATION_PERSONA to ensure valid value
         if key == "CODE_GENERATION_PERSONA" and (not value or value.strip() == ""):
             value = "playwright_ts_code"  # Default to TypeScript if no valid value
+        
+        # Clean Azure OpenAI endpoint if that's what we're getting
+        if key == 'AZURE_OPENAI_ENDPOINT':
+            value = self._clean_azure_endpoint(value)
         
         logger.debug(f"Config get: {key}={self._mask_value(key, value)}")
         return value
@@ -102,4 +107,18 @@ class ConfigManager:
         """Mask sensitive values for logging"""
         if key.endswith(('_API_KEY', '_KEY', 'API_KEY')):
             return self._mask_api_key(value)
-        return value 
+        return value
+
+    def _clean_azure_endpoint(self, endpoint):
+        """Clean Azure OpenAI endpoint to ensure it's just the base URL."""
+        if not endpoint:
+            return endpoint
+            
+        try:
+            # Parse the URL
+            parsed = urlparse(endpoint)
+            # Return just the scheme and netloc (base URL)
+            return f"{parsed.scheme}://{parsed.netloc}"
+        except Exception as e:
+            logger.warning(f"Error cleaning Azure endpoint: {str(e)}")
+            return endpoint 

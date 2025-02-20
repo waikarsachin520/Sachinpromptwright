@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 from typing import Generator
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -102,6 +102,18 @@ class CodeGenerator:
             return ChatAnthropic(
                 model=self.model_name,
                 anthropic_api_key=self.config_manager.get_config('ANTHROPIC_API_KEY'),
+                temperature=0.7,
+                streaming=True
+            )
+        elif self.model_provider == 'azure':
+            logger.info("Using Azure OpenAI configuration")
+            azure_endpoint = self.config_manager.get_config('AZURE_OPENAI_ENDPOINT')
+            logger.info(f"Azure OpenAI Endpoint: {azure_endpoint}")
+            return AzureChatOpenAI(
+                azure_endpoint=azure_endpoint,
+                openai_api_key=self.config_manager.get_config('AZURE_OPENAI_API_KEY'),
+                azure_deployment=self.model_name,
+                api_version=self.config_manager.get_config('AZURE_OPENAI_API_VERSION', '2024-08-01-preview'),
                 temperature=0.7,
                 streaming=True
             )
