@@ -1,9 +1,7 @@
 import os
-import asyncio
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
-from openai import AzureOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -13,11 +11,6 @@ from browser_use.agent.views import AgentHistoryList
 import logging
 from services.config_manager import ConfigManager
 from datetime import datetime
-from utils.logger_config import setup_logger
-from langchain.chat_models.base import BaseChatModel
-from langchain.schema.messages import BaseMessage
-from langchain.callbacks.base import BaseCallbackHandler
-from typing import Any, Dict, List, Optional, Union
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
