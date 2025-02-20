@@ -3,6 +3,7 @@ import asyncio
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
+from openai import AzureOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -13,6 +14,10 @@ import logging
 from services.config_manager import ConfigManager
 from datetime import datetime
 from utils.logger_config import setup_logger
+from langchain.chat_models.base import BaseChatModel
+from langchain.schema.messages import BaseMessage
+from langchain.callbacks.base import BaseCallbackHandler
+from typing import Any, Dict, List, Optional, Union
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -154,13 +159,22 @@ class BrowserTaskRunner:
         elif self.model_provider == 'azure':
             logger.info("Using Azure OpenAI configuration")
             azure_endpoint = self.config_manager.get_config('AZURE_OPENAI_ENDPOINT')
+            deployment_name = self.config_manager.get_config('AZURE_DEPLOYMENT_NAME')
+            api_version = self.config_manager.get_config('AZURE_OPENAI_API_VERSION', '2024-08-01-preview')
+            api_key = self.config_manager.get_config('AZURE_OPENAI_API_KEY')
+            
             logger.info(f"Azure OpenAI Endpoint: {azure_endpoint}")
+            logger.info(f"Azure Deployment Name: {deployment_name}")
+            
             return AzureChatOpenAI(
+                api_version=api_version,
+                azure_deployment=deployment_name,
                 azure_endpoint=azure_endpoint,
-                openai_api_key=self.config_manager.get_config('AZURE_OPENAI_API_KEY'),
-                azure_deployment=self.model_name,
-                api_version=self.config_manager.get_config('AZURE_OPENAI_API_VERSION', '2024-08-01-preview'),
-                temperature=0.7
+                api_key=api_key,
+                temperature=0.7,
+                max_tokens=None,
+                timeout=None,
+                model_name=deployment_name
             )
         elif self.model_provider == 'deepseek':
             logger.info("Using DeepSeek configuration")
@@ -454,4 +468,4 @@ def safe_cleanup_directory(dir_path: Path) -> None:
         except Exception as e:
             logger.warning(f"Failed to remove directory {dir_path}: {str(e)}")
     except Exception as e:
-        logger.warning(f"Error during cleanup of {dir_path}: {str(e)}") 
+        logger.warning(f"Error during cleanup of {dir_path}: {str(e)}")

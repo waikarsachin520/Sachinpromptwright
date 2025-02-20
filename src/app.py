@@ -14,6 +14,7 @@ from pathlib import Path
 import logging
 import sys
 import pandas as pd
+from urllib.parse import urlparse
 
 
 def get_csv_download_link(df):
@@ -703,7 +704,15 @@ with st.sidebar:
         
         # Add Azure OpenAI endpoint if Azure is selected
         if st.session_state.model_provider == "azure":
-            current_settings["AZURE_OPENAI_ENDPOINT"] = st.session_state.azure_endpoint
+            # Clean the endpoint URL before setting it
+            endpoint = st.session_state.azure_endpoint
+            if endpoint:
+                try:
+                    parsed = urlparse(endpoint)
+                    endpoint = f"{parsed.scheme}://{parsed.netloc}"
+                except Exception as e:
+                    logger.warning(f"Error cleaning Azure endpoint: {str(e)}")
+            current_settings["AZURE_OPENAI_ENDPOINT"] = endpoint
         
         config_manager.update_from_ui(current_settings)
     
@@ -721,8 +730,16 @@ with st.sidebar:
         
         # Add Azure OpenAI endpoint if Azure is selected
         if st.session_state.model_provider == "azure":
-            current_settings["AZURE_OPENAI_ENDPOINT"] = st.session_state.azure_endpoint
-            
+            # Clean the endpoint URL before setting it
+            endpoint = st.session_state.azure_endpoint
+            if endpoint:
+                try:
+                    parsed = urlparse(endpoint)
+                    endpoint = f"{parsed.scheme}://{parsed.netloc}"
+                except Exception as e:
+                    logger.warning(f"Error cleaning Azure endpoint: {str(e)}")
+            current_settings["AZURE_OPENAI_ENDPOINT"] = endpoint
+        
         config_manager.update_from_ui(current_settings)
     
     model_provider = st.selectbox(
@@ -735,6 +752,12 @@ with st.sidebar:
     
     # Add Azure OpenAI endpoint input if Azure is selected
     if model_provider == "azure":
+        # Initialize Azure endpoint and deployment name before creating widgets
+        if not st.session_state.get("azure_endpoint"):
+            st.session_state.azure_endpoint = config_manager.get_config('AZURE_OPENAI_ENDPOINT', '')
+        if not st.session_state.get("azure_deployment"):
+            st.session_state.azure_deployment = config_manager.get_config('AZURE_DEPLOYMENT_NAME', '')
+            
         azure_endpoint = st.text_input(
             "Azure OpenAI Endpoint",
             help="Enter your Azure OpenAI endpoint URL (e.g., https://promptwright.openai.azure.com)",
@@ -742,9 +765,13 @@ with st.sidebar:
             placeholder="Enter your Azure OpenAI endpoint URL"
         )
         
-        # Update session state if endpoint is not set
-        if not st.session_state.azure_endpoint:
-            st.session_state.azure_endpoint = config_manager.get_config('AZURE_OPENAI_ENDPOINT', '')
+        # Add Azure deployment name input
+        azure_deployment = st.text_input(
+            "Azure Deployment Name",
+            help="Enter your Azure OpenAI deployment name (defaults to model name if not specified)",
+            key="azure_deployment",
+            placeholder="Enter your Azure deployment name"
+        )
     
     model_name = st.selectbox(
         "Model Name",
@@ -895,6 +922,22 @@ with st.sidebar:
             "BROWSER_CLOUD_PROVIDER": st.session_state.cloud_provider if st.session_state.browser_type == "remote" else "",
             "CODE_GENERATION_PERSONA": st.session_state.code_generation_persona
         }
+        
+        # Add Azure-specific settings if Azure is selected
+        if st.session_state.model_provider == "azure":
+            # Clean the endpoint URL before setting it
+            endpoint = st.session_state.azure_endpoint
+            if endpoint:
+                try:
+                    parsed = urlparse(endpoint)
+                    endpoint = f"{parsed.scheme}://{parsed.netloc}"
+                except Exception as e:
+                    logger.warning(f"Error cleaning Azure endpoint: {str(e)}")
+            current_settings["AZURE_OPENAI_ENDPOINT"] = endpoint
+            
+            # Add Azure deployment name if set
+            if st.session_state.azure_deployment:
+                current_settings["AZURE_DEPLOYMENT_NAME"] = st.session_state.azure_deployment
         
         # Add browser provider API keys if they are set
         if st.session_state.browserbase_key:

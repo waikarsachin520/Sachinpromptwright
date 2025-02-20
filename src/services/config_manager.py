@@ -43,6 +43,17 @@ class ConfigManager:
         if key == 'AZURE_OPENAI_ENDPOINT':
             value = self._clean_azure_endpoint(value)
         
+        # Special handling for Azure deployment name
+        if key == 'AZURE_DEPLOYMENT_NAME':
+            # First try to get explicit deployment name
+            deployment_name = self._runtime_config.get('AZURE_DEPLOYMENT_NAME', os.getenv('AZURE_DEPLOYMENT_NAME'))
+            if deployment_name:
+                value = deployment_name
+            else:
+                # If no deployment name is set, use MODEL_NAME as fallback
+                value = self._runtime_config.get('MODEL_NAME', os.getenv('MODEL_NAME', default))
+            logger.debug(f"Using deployment name: {value}")
+        
         logger.debug(f"Config get: {key}={self._mask_value(key, value)}")
         return value
 
@@ -118,7 +129,9 @@ class ConfigManager:
             # Parse the URL
             parsed = urlparse(endpoint)
             # Return just the scheme and netloc (base URL)
-            return f"{parsed.scheme}://{parsed.netloc}"
+            cleaned = f"{parsed.scheme}://{parsed.netloc}"
+            logger.debug(f"Cleaned Azure endpoint from '{endpoint}' to '{cleaned}'")
+            return cleaned
         except Exception as e:
-            logger.warning(f"Error cleaning Azure endpoint: {str(e)}")
+            logger.warning(f"Error cleaning Azure endpoint '{endpoint}': {str(e)}")
             return endpoint 
