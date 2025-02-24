@@ -1,8 +1,7 @@
 import os
-import asyncio
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -31,17 +30,17 @@ class BrowserTaskRunner:
         project_root = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
         
         # Set history directory to be in the project root
-        history_dir = project_root / 'history'
-        os.environ['HISTORY_DIR'] = str(history_dir)
+        self.history_folder = project_root / 'history'
+        os.environ['HISTORY_DIR'] = str(self.history_folder)
         
         # Check history directory setup
         logger.info(f"\n=== History Directory Configuration ===")
-        logger.info(f"HISTORY_DIR environment variable: {history_dir}")
-        logger.info(f"HISTORY_DIR exists: {Path(history_dir).exists()}")
-        if Path(history_dir).exists():
-            logger.info(f"HISTORY_DIR permissions: {FileUtils.get_file_permissions(Path(history_dir))}")
-            logger.info(f"HISTORY_DIR owner: {FileUtils.get_file_owner(Path(history_dir))}")
-            logger.info(f"HISTORY_DIR group: {FileUtils.get_file_group(Path(history_dir))}")
+        logger.info(f"HISTORY_DIR environment variable: {self.history_folder}")
+        logger.info(f"HISTORY_DIR exists: {Path(self.history_folder).exists()}")
+        if Path(self.history_folder).exists():
+            logger.info(f"HISTORY_DIR permissions: {oct(Path(self.history_folder).stat().st_mode)[-3:]}")
+            logger.info(f"HISTORY_DIR owner: {Path(self.history_folder).owner()}")
+            logger.info(f"HISTORY_DIR group: {Path(self.history_folder).group()}")
         logger.info("=====================================\n")
         
         # Initialize config manager
@@ -160,6 +159,26 @@ class BrowserTaskRunner:
                 anthropic_api_key=self.config_manager.get_config('ANTHROPIC_API_KEY'),
                 temperature=0.7
             )
+        elif self.model_provider == 'azure':
+            logger.info("Using Azure OpenAI configuration")
+            azure_endpoint = self.config_manager.get_config('AZURE_OPENAI_ENDPOINT')
+            deployment_name = self.config_manager.get_config('AZURE_DEPLOYMENT_NAME')
+            api_version = self.config_manager.get_config('AZURE_OPENAI_API_VERSION', '2024-08-01-preview')
+            api_key = self.config_manager.get_config('AZURE_OPENAI_API_KEY')
+            
+            logger.info(f"Azure OpenAI Endpoint: {azure_endpoint}")
+            logger.info(f"Azure Deployment Name: {deployment_name}")
+            
+            return AzureChatOpenAI(
+                api_version=api_version,
+                azure_deployment=deployment_name,
+                azure_endpoint=azure_endpoint,
+                api_key=api_key,
+                temperature=0.7,
+                max_tokens=None,
+                timeout=None,
+                model_name=deployment_name
+            )
         elif self.model_provider == 'deepseek':
             logger.info("Using DeepSeek configuration")
             return ChatOpenAI(
@@ -211,16 +230,15 @@ class BrowserTaskRunner:
         logger.debug(f"conversation_path is set to: {conversation_path}")
         
         # Create history folder if it doesn't exist
-        history_folder = Path(os.getenv('HISTORY_DIR')).resolve()
-        logger.info(f"History folder absolute path: {history_folder}")
-        logger.info(f"History folder exists: {history_folder.exists()}")
-        logger.info(f"History folder parent exists: {history_folder.parent.exists()}")
+        logger.info(f"History folder absolute path: {self.history_folder}")
+        logger.info(f"History folder exists: {self.history_folder.exists()}")
+        logger.info(f"History folder parent exists: {self.history_folder.parent.exists()}")
         
         try:
-            history_folder.mkdir(exist_ok=True)
-            logger.info(f"Successfully created history folder at {history_folder}")
-            logger.info(f"History folder permissions: {FileUtils.get_file_permissions(history_folder)}")
-            logger.info(f"History folder owner: {FileUtils.get_file_owner(history_folder)}")
+            self.history_folder.mkdir(exist_ok=True)
+            logger.info(f"Successfully created history folder at {self.history_folder}")
+            logger.info(f"History folder permissions: {FileUtils.get_file_permissions(self.history_folder)}")
+            logger.info(f"History folder owner: {FileUtils.get_file_owner(self.history_folder)}")
         except Exception as e:
             logger.error(f"Failed to create history folder: {str(e)}")
             logger.error(f"Current process user ID: {os.getuid()}")
@@ -229,7 +247,7 @@ class BrowserTaskRunner:
         
         # Generate timestamp for unique filename and folder
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        timestamp_folder = history_folder / timestamp
+        timestamp_folder = self.history_folder / timestamp
         try:
             timestamp_folder.mkdir(exist_ok=True)
             logger.info(f"Created timestamp folder: {timestamp_folder}")
@@ -267,7 +285,8 @@ class BrowserTaskRunner:
             llm=self.get_llm(),
             use_vision=use_vision,
             browser=self.browser,
-            gif_filename=str(gif_path) if gif_path else None
+            gif_filename=str(gif_path) if gif_path else None,
+            save_conversation_path=str(timestamp_folder / "conversation.json"),
         )
         logger.info("Agent initialized successfully")
         logger.info(f"Agent configuration: task={task}, use_vision={use_vision}, gif_path={gif_path}")
@@ -308,13 +327,13 @@ class BrowserTaskRunner:
                 # Clean up the timestamp folder since task failed
                 if timestamp_folder.exists():
                     logger.info(f"Cleaning up timestamp folder: {timestamp_folder}")
-                    safe_cleanup_directory(timestamp_folder)
+                    self.safe_cleanup_directory(timestamp_folder)
                 raise BrowserTaskExecutionError(f"Task execution failed: {str(e)}")
             
             logger.info("Checking for recording file")
             # Extract actual timestamp from the gif_path that was created
             actual_timestamp = None
-            recording_files = list(Path(history_folder).glob('*/recording_*.gif'))
+            recording_files = list(Path(self.history_folder).glob('*/recording_*.gif'))
             logger.info(f"Found {len(recording_files)} recording files")
             for file in recording_files:
                 if file.exists():
@@ -325,7 +344,7 @@ class BrowserTaskRunner:
             if actual_timestamp and actual_timestamp != timestamp:
                 logger.info(f"Timestamps don't match. Original: {timestamp}, Actual: {actual_timestamp}")
                 # If timestamps don't match, move files to correct folder
-                new_folder = history_folder / actual_timestamp
+                new_folder = self.history_folder / actual_timestamp
                 logger.info(f"Creating new folder: {new_folder}")
                 if not new_folder.exists():
                     new_folder.mkdir(exist_ok=True)
@@ -418,37 +437,36 @@ class BrowserTaskRunner:
         """Close the browser instance"""
         await self.browser.close()
 
-# Function to safely clean up a directory
-def safe_cleanup_directory(dir_path: Path) -> None:
-    try:
-        # Ensure we're working with an absolute path
-        dir_path = dir_path.resolve()
-        logger.info(f"Cleaning up directory (absolute path): {dir_path}")
-        
-        if not dir_path.exists():
-            logger.info(f"Directory does not exist, skipping cleanup: {dir_path}")
-            return
-        
-        # Verify this is a subdirectory of the history folder
-        if not str(dir_path).startswith(str(history_folder)):
-            logger.error(f"Attempted to clean directory outside history folder: {dir_path}")
-            return
-        
-        logger.info(f"Cleaning up directory: {dir_path}")
-        for item in dir_path.iterdir():
-            try:
-                if item.is_file():
-                    item.unlink()
-                    logger.info(f"Removed file: {item}")
-                elif item.is_dir():
-                    safe_cleanup_directory(item)
-            except Exception as e:
-                logger.warning(f"Failed to remove {item}: {str(e)}")
-        
+    def safe_cleanup_directory(self, dir_path: Path) -> None:
         try:
-            dir_path.rmdir()
-            logger.info(f"Removed directory: {dir_path}")
+            # Ensure we're working with an absolute path
+            dir_path = dir_path.resolve()
+            logger.info(f"Cleaning up directory (absolute path): {dir_path}")
+            
+            if not dir_path.exists():
+                logger.info(f"Directory does not exist, skipping cleanup: {dir_path}")
+                return
+            
+            # Verify this is a subdirectory of the history folder
+            if not str(dir_path).startswith(str(self.history_folder)):
+                logger.error(f"Attempted to clean directory outside history folder: {dir_path}")
+                return
+            
+            logger.info(f"Cleaning up directory: {dir_path}")
+            for item in dir_path.iterdir():
+                try:
+                    if item.is_file():
+                        item.unlink()
+                        logger.info(f"Removed file: {item}")
+                    elif item.is_dir():
+                        self.safe_cleanup_directory(item)
+                except Exception as e:
+                    logger.warning(f"Failed to remove {item}: {str(e)}")
+            
+            try:
+                dir_path.rmdir()
+                logger.info(f"Removed directory: {dir_path}")
+            except Exception as e:
+                logger.warning(f"Failed to remove directory {dir_path}: {str(e)}")
         except Exception as e:
-            logger.warning(f"Failed to remove directory {dir_path}: {str(e)}")
-    except Exception as e:
-        logger.warning(f"Error during cleanup of {dir_path}: {str(e)}") 
+            logger.warning(f"Error during cleanup of {dir_path}: {str(e)}")

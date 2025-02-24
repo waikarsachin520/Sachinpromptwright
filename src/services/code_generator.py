@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 from typing import Generator
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -103,6 +103,27 @@ class CodeGenerator:
                 model=self.model_name,
                 anthropic_api_key=self.config_manager.get_config('ANTHROPIC_API_KEY'),
                 temperature=0.7,
+                streaming=True
+            )
+        elif self.model_provider == 'azure':
+            logger.info("Using Azure OpenAI configuration")
+            azure_endpoint = self.config_manager.get_config('AZURE_OPENAI_ENDPOINT')
+            deployment_name = self.config_manager.get_config('AZURE_DEPLOYMENT_NAME')
+            api_version = self.config_manager.get_config('AZURE_OPENAI_API_VERSION', '2024-08-01-preview')
+            api_key = self.config_manager.get_config('AZURE_OPENAI_API_KEY')
+            
+            logger.info(f"Azure OpenAI Endpoint: {azure_endpoint}")
+            logger.info(f"Azure Deployment Name: {deployment_name}")
+            
+            return AzureChatOpenAI(
+                api_version=api_version,
+                azure_deployment=deployment_name,
+                azure_endpoint=azure_endpoint,
+                api_key=api_key,
+                temperature=0.7,
+                max_tokens=None,
+                timeout=None,
+                model_name=deployment_name,
                 streaming=True
             )
         elif self.model_provider == 'deepseek':

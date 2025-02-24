@@ -14,6 +14,8 @@ from pathlib import Path
 import logging
 import sys
 import pandas as pd
+from urllib.parse import urlparse
+
 
 def get_csv_download_link(df):
     """Generate a link allowing the data in a given pandas dataframe to be downloaded"""
@@ -170,15 +172,26 @@ def initialize_session_state():
             # Initialize session state with saved values
             for key, value in saved.items():
                 if key.endswith('_API_KEY'):
-                    key_name = key.lower().replace('_api_key', '_key')
-                    st.session_state[key_name] = value
+                    if key == 'AZURE_OPENAI_API_KEY' and saved.get('MODEL_PROVIDER') == 'azure':
+                        st.session_state.api_key = value
+                    elif key != 'AZURE_OPENAI_API_KEY' and saved.get('MODEL_PROVIDER') in key.lower():
+                        st.session_state.api_key = value
+                elif key == 'AZURE_OPENAI_ENDPOINT':
+                    st.session_state.azure_endpoint = value
                 else:
                     st.session_state[key.lower()] = value
         else:
             # Initialize with defaults from config manager
             st.session_state.model_provider = config_manager.get_config('MODEL_PROVIDER', 'openai')
             st.session_state.model_name = config_manager.get_config('MODEL_NAME', 'gpt-4')
-            st.session_state.api_key = config_manager.get_config(f"{st.session_state.model_provider.upper()}_API_KEY", '')
+            
+            # Set the appropriate API key based on the model provider
+            if st.session_state.model_provider == 'azure':
+                st.session_state.api_key = config_manager.get_config('AZURE_OPENAI_API_KEY', '')
+            else:
+                st.session_state.api_key = config_manager.get_config(f"{st.session_state.model_provider.upper()}_API_KEY", '')
+            
+            st.session_state.azure_endpoint = config_manager.get_config('AZURE_OPENAI_ENDPOINT', '')
             st.session_state.use_vision = config_manager.get_config('USE_VISION', 'false').lower() == 'true'
             st.session_state.browser_type = config_manager.get_config('BROWSER_TYPE', 'local')
             st.session_state.cloud_provider = config_manager.get_config('BROWSER_CLOUD_PROVIDER', '')
@@ -648,14 +661,34 @@ with st.sidebar:
     st.markdown("<div class='sidebar-section'>", unsafe_allow_html=True)
     st.markdown("<h3 class='sidebar-header'>🤖 Model Settings</h3>", unsafe_allow_html=True)
     
-    # Dynamic model options based on provider
-    model_options = {
+    # Dynamic model options based on provider and environment variables
+    def get_model_list_from_env(env_var_name, default_list):
+        """Helper function to get model list from environment variable"""
+        models_str = config_manager.get_config(env_var_name, '')
+        return models_str.split(',') if models_str else default_list
+    
+    # Default model options as fallback
+    default_model_options = {
         "openai": ["gpt-4", "gpt-4o-mini", "gpt-4o"],
+        "azure": ["gpt-4", "gpt-4-turbo", "gpt-35-turbo"],
         "anthropic": ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022"],
         "deepseek": ["deepseek-chat"],
         "groq": ["mixtral-8x7b-32768", "llama-3.3-70b-versatile"],
         "google": ["gemini-2.0-flash", "gemini-2.0-flash-lite-preview-02-05", "gemini-1.5-pro"]
     }
+    
+    # Load model options from environment variables
+    model_options = {
+        "openai": get_model_list_from_env('OPENAI_MODELS', default_model_options["openai"]),
+        "azure": get_model_list_from_env('AZURE_OPENAI_MODELS', default_model_options["azure"]),
+        "anthropic": get_model_list_from_env('ANTHROPIC_MODELS', default_model_options["anthropic"]),
+        "deepseek": get_model_list_from_env('DEEPSEEK_MODELS', default_model_options["deepseek"]),
+        "groq": get_model_list_from_env('GROQ_MODELS', default_model_options["groq"]),
+        "google": get_model_list_from_env('GOOGLE_MODELS', default_model_options["google"])
+    }
+    
+    # Filter out empty strings from model lists
+    model_options = {k: [m for m in v if m.strip()] for k, v in model_options.items()}
     
     # Create a callback to update config when model provider changes
     def on_model_provider_change():
@@ -668,6 +701,19 @@ with st.sidebar:
             "BROWSER_CLOUD_PROVIDER": st.session_state.cloud_provider if st.session_state.browser_type == "remote" else "",
             "CODE_GENERATION_PERSONA": st.session_state.code_generation_persona
         }
+        
+        # Add Azure OpenAI endpoint if Azure is selected
+        if st.session_state.model_provider == "azure":
+            # Clean the endpoint URL before setting it
+            endpoint = st.session_state.azure_endpoint
+            if endpoint:
+                try:
+                    parsed = urlparse(endpoint)
+                    endpoint = f"{parsed.scheme}://{parsed.netloc}"
+                except Exception as e:
+                    logger.warning(f"Error cleaning Azure endpoint: {str(e)}")
+            current_settings["AZURE_OPENAI_ENDPOINT"] = endpoint
+        
         config_manager.update_from_ui(current_settings)
     
     # Create a callback to update config when model name changes
@@ -681,15 +727,51 @@ with st.sidebar:
             "BROWSER_CLOUD_PROVIDER": st.session_state.cloud_provider if st.session_state.browser_type == "remote" else "",
             "CODE_GENERATION_PERSONA": st.session_state.code_generation_persona
         }
+        
+        # Add Azure OpenAI endpoint if Azure is selected
+        if st.session_state.model_provider == "azure":
+            # Clean the endpoint URL before setting it
+            endpoint = st.session_state.azure_endpoint
+            if endpoint:
+                try:
+                    parsed = urlparse(endpoint)
+                    endpoint = f"{parsed.scheme}://{parsed.netloc}"
+                except Exception as e:
+                    logger.warning(f"Error cleaning Azure endpoint: {str(e)}")
+            current_settings["AZURE_OPENAI_ENDPOINT"] = endpoint
+        
         config_manager.update_from_ui(current_settings)
     
     model_provider = st.selectbox(
         "Model Provider",
-        ["openai", "anthropic", "deepseek", "groq", "google"],
+        ["openai", "azure", "anthropic", "deepseek", "groq", "google"],
         help="Select the AI model provider for task execution and code generation",
         key="model_provider",
         on_change=on_model_provider_change
     )
+    
+    # Add Azure OpenAI endpoint input if Azure is selected
+    if model_provider == "azure":
+        # Initialize Azure endpoint and deployment name before creating widgets
+        if not st.session_state.get("azure_endpoint"):
+            st.session_state.azure_endpoint = config_manager.get_config('AZURE_OPENAI_ENDPOINT', '')
+        if not st.session_state.get("azure_deployment"):
+            st.session_state.azure_deployment = config_manager.get_config('AZURE_DEPLOYMENT_NAME', '')
+            
+        azure_endpoint = st.text_input(
+            "Azure OpenAI Endpoint",
+            help="Enter your Azure OpenAI endpoint URL (e.g., https://promptwright.openai.azure.com)",
+            key="azure_endpoint",
+            placeholder="Enter your Azure OpenAI endpoint URL"
+        )
+        
+        # Add Azure deployment name input
+        azure_deployment = st.text_input(
+            "Azure Deployment Name",
+            help="Enter your Azure OpenAI deployment name (defaults to model name if not specified)",
+            key="azure_deployment",
+            placeholder="Enter your Azure deployment name"
+        )
     
     model_name = st.selectbox(
         "Model Name",
@@ -699,10 +781,21 @@ with st.sidebar:
         on_change=on_model_name_change
     )
     
+    # Update API key label for Azure
+    api_key_label = "Azure OpenAI API Key" if model_provider == "azure" else f"{model_provider.title()} API Key"
+    
+    # Get the appropriate API key based on provider
+    if model_provider == "azure":
+        if not st.session_state.get("api_key"):
+            st.session_state.api_key = config_manager.get_config('AZURE_OPENAI_API_KEY', '')
+    else:
+        if not st.session_state.get("api_key"):
+            st.session_state.api_key = config_manager.get_config(f'{model_provider.upper()}_API_KEY', '')
+    
     api_key = st.text_input(
-        f"{model_provider.title()} API Key",
+        api_key_label,
         type="password",
-        help=f"Enter your {model_provider.title()} API key for authentication",
+        help=f"Enter your {api_key_label} for authentication",
         key="api_key"
     )
     
@@ -829,6 +922,22 @@ with st.sidebar:
             "BROWSER_CLOUD_PROVIDER": st.session_state.cloud_provider if st.session_state.browser_type == "remote" else "",
             "CODE_GENERATION_PERSONA": st.session_state.code_generation_persona
         }
+        
+        # Add Azure-specific settings if Azure is selected
+        if st.session_state.model_provider == "azure":
+            # Clean the endpoint URL before setting it
+            endpoint = st.session_state.azure_endpoint
+            if endpoint:
+                try:
+                    parsed = urlparse(endpoint)
+                    endpoint = f"{parsed.scheme}://{parsed.netloc}"
+                except Exception as e:
+                    logger.warning(f"Error cleaning Azure endpoint: {str(e)}")
+            current_settings["AZURE_OPENAI_ENDPOINT"] = endpoint
+            
+            # Add Azure deployment name if set
+            if st.session_state.azure_deployment:
+                current_settings["AZURE_DEPLOYMENT_NAME"] = st.session_state.azure_deployment
         
         # Add browser provider API keys if they are set
         if st.session_state.browserbase_key:
